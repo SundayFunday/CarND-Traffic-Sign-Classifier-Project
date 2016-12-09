@@ -1,16 +1,37 @@
-import numpy as np
+import os
+
 import cv2
-import tensorflow as tf
 import matplotlib.pylab as plt
 from matplotlib.gridspec import GridSpec
 
-def normalize_image(image):
-    return cv2.normalize(image, None, 0.1, 0.9, cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+import numpy as np
+import tensorflow as tf
 
-def pre_process(image):
+
+def normalize_image(image):
+    return cv2.normalize(image, None, 0.0, 1.0, cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+
+
+def bind_image(image, box, src):
+    imshape = image.shape[:2]
+    src_img = cv2.resize(image, tuple(src))
+    x1, y1, x2, y2 = box 
+    src_img = src_img[y1:y2, x1:x2,:]
+    try:
+        dst_img = cv2.resize(src_img, imshape)
+    except:
+        dst_img = image
+    return dst_img
+
+
+def pre_process(image, box=None, src=None):
+    if box is not None and src is not None:
+        image = bind_image(image, box, src)
+    
     image = normalize_image(image)
     image = cv2.resize(image, (48, 48))
     return image
+
 
 def random_translate(image):
     rows, cols = image.shape[:2]
@@ -71,17 +92,25 @@ def batch_generator(images, labels, batch_count=None,batch_size=50):
 
 
 ####Tensorflow functions####
+##Dislaimer: These function were borrowed and inspired from the following tutorial
+## https://github.com/Hvass-Labs/TensorFlow-Tutorials/blob/master/02_Convolutional_Neural_Network.ipynb
 
 def new_weights(shape):
     return tf.Variable(tf.truncated_normal(shape, stddev=0.05))
 
+
 def new_biases(length):
     return tf.Variable(tf.constant(0.05, shape=[length]))
 
+
 def fc_layer(input_layer,
-            num_inputs,
-            num_outputs,
-            use_relu=True):
+             num_inputs,
+             num_outputs,
+             use_relu=True,
+             l2 = True,
+             dropout = None,
+             keep_prob = 1
+             ):
 
     weights = new_weights(shape=[num_inputs, num_outputs])
     biases = new_biases(length=num_outputs)
@@ -89,8 +118,13 @@ def fc_layer(input_layer,
 
     if use_relu:
         layer = tf.nn.relu(layer)
-
-    return layer
+    if l2:
+        reg = tf.nn.l2_loss(weights) + tf.nn.l2_loss(biases)
+    else:
+        reg = 0
+    if dropout:
+        layer = tf.nn.dropout(layer, keep_prob=keep_prob)
+    return layer, reg
 
 
 def conv_layer(input_layer,
@@ -129,6 +163,15 @@ def flatten_layer(layer):
 
 #### Misc Functions ###
 
+class StopTraining(Exception):
+    pass
+
+def get_model_dir():
+    model_dir = '{}/{}'.format(os.getcwd(),'model_dir')
+    if not os.path.exists(model_dir):
+        os.mkdir(model_dir)
+    return model_dir
+
 
 def get_label_map(f_name, labels):
     mapper = np.genfromtxt(f_name, delimiter=',', usecols=(1,), dtype=str, skip_header=1)
@@ -144,12 +187,6 @@ def get_unique_images(images, labels):
 def group(labels):
     unique, counts = np.unique(labels, return_counts=True)
     return np.asarray((unique, counts)).T
-
-
-def get_label_map(f_name, labels):
-    mapper = np.genfromtxt(f_name, delimiter=',', usecols=(1,), dtype=str, skip_header=1)
-    crapper = np.vectorize(lambda x : mapper[x])
-    return crapper(labels)
 
 
 def plot_class_frequencies(labels):

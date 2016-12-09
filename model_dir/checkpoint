@@ -1,0 +1,2 @@
+model_checkpoint_path: "/files/sdcnd/traffic-signs/model_dir/the_model"
+all_model_checkpoint_paths: "/files/sdcnd/traffic-signs/model_dir/the_model"

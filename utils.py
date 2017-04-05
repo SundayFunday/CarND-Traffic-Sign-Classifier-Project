@@ -15,6 +15,7 @@ def normalize_image(image):
 def bind_image(image, box, src):
     imshape = image.shape[:2]
     src_img = cv2.resize(image, tuple(src))
+    print(box)
     x1, y1, x2, y2 = box 
     src_img = src_img[y1:y2, x1:x2,:]
     try:
@@ -26,6 +27,7 @@ def bind_image(image, box, src):
 
 def pre_process(image, box=None, src=None):
     if box is not None and src is not None:
+        print(box)
         image = bind_image(image, box, src)
     
     image = normalize_image(image)
